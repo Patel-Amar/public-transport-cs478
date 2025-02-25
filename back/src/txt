@@ -1,0 +1,77 @@
+async function processRoute(filePath: string, agency: string) {
+    const stopTimesPath = path.join(filePath, "stop_times.txt");
+    const tripsPath = path.join(filePath, "trips.txt");
+    const routesPath = path.join(filePath, "routes.txt");
+    const calendarPath = path.join(filePath, "calendar.txt");
+
+    const stopTimes = await loadFile < StopTime > (stopTimesPath);
+    const trips = await loadFile < Trip > (tripsPath);
+    const routes = await loadFile < Route > (routesPath);
+    const calendar = fs.existsSync(calendarPath) ? await loadFile < Calendar > (calendarPath) : null;
+
+    const insertRouteStmt = db.prepare(
+        INSERT OR IGNORE INTO routes(station_a, station_b, transport_type, line_name, agency)
+        VALUES(?, ?, ?, ?, ?)
+    );
+
+    const insertScheduleStmt = db.prepare(
+        INSERT OR IGNORE INTO schedules
+        (route_id, departure, arrival, monday, tuesday, wednesday, thursday, friday, saturday, sunday)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    );
+
+    const visitedRoutes = new Map();
+
+    const processTransaction = db.transaction(() => {
+        for (const route of routes) {
+            if (route.route_type !== 3) {
+                const relatedTrips = trips.filter((trip) => trip.route_id === route.route_id);
+                for (const trip of relatedTrips) {
+                    const tripStopTimes = stopTimes
+                        .filter((stopTime) => stopTime.trip_id === trip.trip_id)
+                        .sort((a, b) => a.stop_sequence - b.stop_sequence);
+
+                    let schedule = { monday: 1, tuesday: 1, wednesday: 1, thursday: 1, friday: 1, saturday: 1, sunday: 1 };
+                    if (calendar) schedule = calendar.find((cal) => cal.service_id === trip.service_id) || schedule;
+
+                    for (let i = 0; i < tripStopTimes.length - 1; i++) {
+                        const stationAID = tripStopTimes[i].stop_id;
+                        const stationBID = tripStopTimes[i + 1].stop_id;
+
+                        const stationA = stationStops.get(${ stationAID } - ${ agency });
+                        const stationB = stationStops.get(${ stationBID } - ${ agency });
+
+                        // Log the station matching for debugging
+                        if (!stationA || !stationB || stationA === stationB) {
+                            console.log(Skipping route due to invalid stations: ${ stationAID } - ${ stationBID });
+                            continue;
+                        }
+
+                        const routeKey = ${ route.route_long_name }-${ stationA } -${ stationB };
+
+                        if (!visitedRoutes.has(routeKey)) {
+                            const { lastInsertRowid } = insertRouteStmt.run(stationA, stationB, route.route_type, route.route_long_name, agency);
+                            visitedRoutes.set(routeKey, lastInsertRowid);
+                        }
+
+                        if (visitedRoutes.get(routeKey)) {
+                            insertScheduleStmt.run(
+                                visitedRoutes.get(routeKey),
+                                tripStopTimes[i].departure_time,
+                                tripStopTimes[i + 1].arrival_time,
+                                schedule.monday, schedule.tuesday, schedule.wednesday, schedule.thursday,
+                                schedule.friday, schedule.saturday, schedule.sunday
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    try {
+        processTransaction(); // Execute the bulk insert transaction
+    } catch (error) {
+        console.error("Error during transaction:", error);
+    }
+}

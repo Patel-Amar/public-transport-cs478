@@ -1,0 +1,36 @@
+{
+    "scripts": {
+        "setup": "rm -f database.db && sqlite3 database.db < setup.sql",
+        "build": "rm -rf out && mkdir out && tsc",
+        "start": "cd out && node server.js",
+        "watch": "npm run build && tsc-watch --onSuccess \"npm run start\"",
+        "test": "node --test --test-concurrency 1"
+    },
+    "type": "module",
+    "dependencies": {
+        "@chakra-ui/react": "^3.8.0",
+        "argon2": "^0.41.1",
+        "better-sqlite3": "^11.8.1",
+        "cookie-parser": "^1.4.6",
+        "cron": "^3.5.0",
+        "csv-parser": "^3.2.0",
+        "dotenv": "^16.4.7",
+        "express": "^4.18.2",
+        "express-rate-limit": "^7.5.0",
+        "node-fetch": "^3.3.2",
+        "string-similarity-js": "^2.1.4",
+        "unzipper": "^0.12.3",
+        "zod": "^3.24.1"
+    },
+    "devDependencies": {
+        "@types/better-sqlite3": "^7.6.12",
+        "@types/cookie-parser": "^1.4.6",
+        "@types/express": "^4.17.15",
+        "@types/node": "^18.11.18",
+        "@types/unzipper": "^0.10.10",
+        "axios": "^1.2.2",
+        "ts-node": "^10.9.1",
+        "tsc-watch": "^6.0.0",
+        "typescript": "^4.9.4"
+    }
+}

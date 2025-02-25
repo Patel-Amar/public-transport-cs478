@@ -1,0 +1,14 @@
+{
+    "include": [
+        "src/**/*"
+    ],
+    "compilerOptions": {
+        "outDir": "out",
+        // enable top-level await and import/export syntax
+        "target": "ES2017",
+        "moduleResolution": "node16",
+        "module": "Node16",
+        // enable type checking
+        "strict": true,
+    }
+}
