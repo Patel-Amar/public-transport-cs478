@@ -1,12 +1,20 @@
 export type route_plan = route[];
 
 export type route = {
-    id: string,
     agency: string,
-    route_type: number,
-    station_a: number | bigint,
-    station_b: number | bigint,
-    line_name: string
+    transport_type: number,
+    station_id: number,
+    station_seq: number,
+    line_name: string,
+    departure: string,
+    arrival: string,
+    monday: string,
+    tuesday: string,
+    wednesday: string,
+    thursday: string,
+    friday: string,
+    saturday: string,
+    sunday: string
 }
 
 export type schedule = {

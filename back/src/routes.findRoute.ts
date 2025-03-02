@@ -17,7 +17,7 @@ const db = new Database(':memory:');
 db.exec(`ATTACH DATABASE "${__dirname}database.db" AS disk`);
 db.exec('CREATE TABLE main.routes AS SELECT * FROM disk.routes');
 db.exec('CREATE TABLE main.stations AS SELECT * FROM disk.stations');
-db.exec('CREATE TABLE main.schedules AS SELECT * FROM disk.schedules');
+// db.exec('CREATE TABLE main.schedules AS SELECT * FROM disk.schedules');
 db.pragma('journal_mode = WAL');
 db.pragma("foreign_keys = ON");
 
@@ -417,10 +417,10 @@ router.get("/", async (req: Request, res: Response) => {
     // FROM schedules s
     // JOIN routes r ON s.route_id = r.id
     // WHERE r.station_a = ? `)
-    let s = db.prepare("SELECT * FROM stations s WHERE s.id='204'");
+    //let s = db.prepare("SELECT * FROM stations s WHERE s.id='204'");
     // await buildGraph();
-    // return res.json({ data: [...graph.entries()] });
-    return res.json({ data: s.all() });
+    return res.json({ data: [...graph.entries()] });
+    //return res.json({ data: s.all() });
 });
 router.get("/:start/:end", findRoute1);
 

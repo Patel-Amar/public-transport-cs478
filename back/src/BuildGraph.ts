@@ -18,13 +18,17 @@ db.pragma("synchronous = OFF");
 
 export async function buildGraph() {
     const rowsB =
-        db.prepare(`
-            SELECT r.id AS route_id, r.station_a AS station, s.lat AS lat, s.long AS long, s.id AS id, s.station_name AS station_name, 
-            s.stop_id AS stop_id, s.agency AS agency, r.line_name AS line_name
-            FROM routes r
-            JOIN stations s ON r.station_b = s.id
-        `).all();
+        db.prepare(`WITH next_stations AS (
+                        SELECT station_id AS from_station, line_name, agency, station_seq, 
+                            LEAD(station_id) OVER (PARTITION BY line_name, agency ORDER BY station_seq) AS to_station
+                        FROM routes
+                    )
+                    SELECT ns.from_station AS station, ns.to_station AS stop_id, ns.line_name, ns.agency, s.lat, s.long, s.id AS station_id, s.station_name, s.stop_id
+                    FROM next_stations ns
+                    JOIN stations s ON ns.to_station = s.id
+                    WHERE ns.to_station IS NOT NULL;
 
+    `).all();
 
     const tempGraph = new Map<number, stationsOnRoute[]>();
 
@@ -42,7 +46,7 @@ export async function buildGraph() {
         SELECT r.id AS route_id, n.station_a AS station, s.lat AS lat, s.long AS long, s.id AS id,
                s.station_name AS station_name, s.stop_id AS stop_id, s.agency AS agency, r.line_name AS line_name
         FROM nearbyStations n
-        JOIN routes r ON r.station_b = n.station_b
+        JOIN routes r ON r.station_id = n.station_b
         JOIN stations s ON s.id = n.station_b
     `).all();
 

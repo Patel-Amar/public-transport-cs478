@@ -187,18 +187,18 @@ async function processRoutes(filePath: string, agency: string) {
     });
 
     let routeData: route[] = [];
-    let scheduleData: schedule[] = [];
+    // let scheduleData: schedule[] = [];
 
     const insertRouteStmt = db.prepare(`
-        INSERT OR IGNORE INTO routes (id, station_a, station_b, transport_type, line_name, agency)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT OR IGNORE INTO routes (station_id, station_seq, transport_type, line_name, agency, departure, arrival, monday, tuesday, wednesday, thursday, friday, saturday, sunday)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const insertScheduleStmt = db.prepare(`
-        INSERT OR IGNORE INTO schedules
-        (route_id, departure, arrival, monday, tuesday, wednesday, thursday, friday, saturday, sunday)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+    // const insertScheduleStmt = db.prepare(`
+    //     INSERT OR IGNORE INTO schedules
+    //     (route_id, departure, arrival, monday, tuesday, wednesday, thursday, friday, saturday, sunday)
+    //     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    // `);
 
     for (const route of routes) {
         console.log(route.route_long_name);
@@ -212,32 +212,25 @@ async function processRoutes(filePath: string, agency: string) {
             const stopList = stopTimesMap.get(trip.trip_id);
             if (!stopList || stopList.length < 2) continue;
 
-            stopList.sort((a, b) => a.stop_sequence - b.stop_sequence);
+            for (let i = 0; i < stopList.length; i++) {
+                let stop = stopList[i];
 
-            for (let i = 0; i < stopList.length - 1; i++) {
-                let stop_a = stopList[i];
-                let stop_b = stopList[i + 1];
+                let stop_id = stationStops.get(`${stop.stop_id}-${agency}`);
 
-                let stop_a_id = stationStops.get(`${stop_a.stop_id}-${agency}`);
-                let stop_b_id = stationStops.get(`${stop_b.stop_id}-${agency}`);
-
-                if (!stop_a_id || !stop_b_id || stop_a_id === stop_b_id) {
+                if (!stop_id) {
                     continue;
                 }
 
-                let id = `${stop_a_id}-${stop_b_id}-${agency}`;
-
-                routeData.push({
-                    id, agency, route_type: route.route_type,
-                    station_a: stop_a_id, station_b: stop_b_id, line_name: route.route_long_name
-                });
-
                 let schedule = calendarMap.get(trip.service_id);
 
-                scheduleData.push({
-                    route_id: id,
-                    departure: stop_a.departure_time,
-                    arrival: stop_b.arrival_time,
+                routeData.push({
+                    agency: agency,
+                    transport_type: route.route_type,
+                    station_id: stop_id,
+                    station_seq: stop.stop_sequence,
+                    line_name: route.route_long_name,
+                    departure: stop.departure_time,
+                    arrival: stop.arrival_time,
                     monday: schedule[0],
                     tuesday: schedule[1],
                     wednesday: schedule[2],
@@ -246,17 +239,30 @@ async function processRoutes(filePath: string, agency: string) {
                     saturday: schedule[5],
                     sunday: schedule[6]
                 });
+
+                // scheduleData.push({
+                //     route_id: id,
+                //     departure: stop_a.departure_time,
+                //     arrival: stop_b.arrival_time,
+                //     monday: schedule[0],
+                //     tuesday: schedule[1],
+                //     wednesday: schedule[2],
+                //     thursday: schedule[3],
+                //     friday: schedule[4],
+                //     saturday: schedule[5],
+                //     sunday: schedule[6]
+                // });
             }
         }
     }
 
     db.transaction(() => {
         for (const row of routeData) {
-            insertRouteStmt.run(row.id, row.station_a, row.station_b, row.route_type, row.line_name, row.agency);
+            insertRouteStmt.run(row.station_id, row.station_seq, row.transport_type, row.line_name, row.agency, row.departure, row.arrival, row.monday, row.tuesday, row.wednesday, row.thursday, row.friday, row.saturday, row.sunday);
         }
-        for (const row of scheduleData) {
-            insertScheduleStmt.run(row.route_id, row.departure, row.arrival, row.monday, row.tuesday, row.wednesday, row.thursday, row.friday, row.saturday, row.sunday);
-        }
+        // for (const row of scheduleData) {
+        //     insertScheduleStmt.run(row.route_id, row.departure, row.arrival, row.monday, row.tuesday, row.wednesday, row.thursday, row.friday, row.saturday, row.sunday);
+        // }
     })();
 }
 
