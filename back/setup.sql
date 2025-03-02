@@ -20,6 +20,17 @@ CREATE TABLE routes (
     FOREIGN KEY(station_b) REFERENCES stations(id)
 );
 
+CREATE TABLE nearbyStations (
+    id INTEGER PRIMARY KEY,
+    station_a INTEGER,
+    a_agency TEXT,
+    station_b INTEGER,
+    b_agency TEXT,
+    dist INTEGER,
+    FOREIGN KEY(station_a) REFERENCES stations(id),
+    FOREIGN KEY(station_b) REFERENCES stations(id)
+);
+
 CREATE TABLE schedules (
     id INTEGER PRIMARY KEY,
     route_id INTEGER NOT NULL,
@@ -39,6 +50,7 @@ CREATE TABLE schedules (
 CREATE INDEX IF NOT EXISTS idx_stations_stop_id ON stations (stop_id);
 CREATE INDEX IF NOT EXISTS idx_routes_station_a ON routes (station_a);
 CREATE INDEX IF NOT EXISTS idx_routes_station_b ON routes (station_b);
+CREATE INDEX IF NOT EXISTS idx_station_distances ON nearbyStations (station_a, station_b);
 
 
 CREATE TABLE shape_id (

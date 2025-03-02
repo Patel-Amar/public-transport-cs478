@@ -60,7 +60,8 @@ export type stationTimes = {
 } & { [key: string]: any };
 
 export type timediff = {
-    time: string,
+    departure: string,
+    arrival: string,
     timediff: number
 }
 

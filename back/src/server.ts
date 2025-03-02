@@ -3,6 +3,7 @@ import cookieParser from "cookie-parser";
 import { rateLimit } from 'express-rate-limit'
 import findRoute from './routes.findRoute.js'
 import { populateData } from "./populateData.js";
+import { buildGraph } from './BuildGraph.js';
 // import { populateData } from "./populateData.js";
 
 const limiter = rateLimit({
@@ -23,8 +24,6 @@ const router = express.Router();
 router.use("/search", findRoute);
 
 app.use("/api", router);
-
-populateData();
 
 
 // run server

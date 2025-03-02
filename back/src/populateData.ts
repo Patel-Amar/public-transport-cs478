@@ -14,11 +14,17 @@ db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
 db.pragma("synchronous = OFF");
 
+
+db.function("haversine", (lat1, long1, lat2, long2) => {
+    return distanceBetween(lat1 as number, long1 as number, lat2 as number, long2 as number);
+});
+
 async function populateSeptaData() {
     let outputDir = await getGTFSZip("https://www3.septa.org/developer/gtfs_public.zip", false);
     if (outputDir) {
         await unzip(outputDir, "google_bus.zip");
         await parseData(outputDir, "SEPTA");
+        fs.rmSync(outputDir, { recursive: true, force: true });
     }
     outputDir = await getGTFSZip("https://www3.septa.org/developer/gtfs_public.zip", false);
     if (outputDir) {
@@ -34,6 +40,16 @@ async function populateNJTransitData() {
         await parseData(outputDir, "NJTransit");
     }
     fs.rmSync(outputDir, { recursive: true, force: true });
+}
+
+function populateNearbyStations() {
+    const stmt = db.prepare("INSERT INTO nearbyStations (station_a, a_agency, station_b, b_agency, dist) \
+                    SELECT sa.id AS station_a, sa.agency AS a_agency, sb.id AS station_b, sb.agency AS b_agency, haversine(sa.lat, sa.long, sb.lat, sb.long) AS dist \
+                    FROM stations sa, stations sb \
+                    WHERE sa.id != sb.id \
+                    AND haversine(sa.lat, sa.long, sb.lat, sb.long) <= 1");
+
+    stmt.run();
 }
 
 async function unzip(filePath: string, filename: string) {
@@ -244,6 +260,21 @@ async function processRoutes(filePath: string, agency: string) {
     })();
 }
 
+function distanceBetween(lat1: number, long1: number, lat2: number, long2: number) {
+    var R = 3963.1;
+    var dLat = toRad(lat2 - lat1);
+    var dLon = toRad(long2 - long1);
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    let c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+function toRad(num: number) {
+    return num * Math.PI / 180;
+}
+
 function loadFile<T>(filePath: string): Promise<T[]> {
     return new Promise((resolve, reject) => {
         const results: T[] = [];
@@ -255,13 +286,10 @@ function loadFile<T>(filePath: string): Promise<T[]> {
     });
 }
 
-const cronJob = new CronJob("0 0 * * *", () => {
-    populateData();
-});
-
 export async function populateData() {
     let start = new Date().getTime();
     // await populateSeptaData();
     // await populateNJTransitData();
+    // populateNearbyStations();
     console.log("Data update complete:", (new Date().getTime() - start) / 60000);
 }
