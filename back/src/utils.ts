@@ -1,21 +1,22 @@
 export type route_plan = route[];
 
 export type route = {
-    agency: string,
-    transport_type: number,
-    station_id: number,
-    station_seq: number,
-    line_name: string,
-    departure: string,
-    arrival: string,
-    monday: string,
-    tuesday: string,
-    wednesday: string,
-    thursday: string,
-    friday: string,
-    saturday: string,
-    sunday: string
-}
+    agency: string;
+    transport_type: number;
+    station_id: number;
+    station_seq: number;
+    line_name: string;
+    departure: string;
+    arrival: string;
+    monday: string;
+    tuesday: string;
+    wednesday: string;
+    thursday: string;
+    friday: string;
+    saturday: string;
+    sunday: string;
+    trip_id: string;
+};
 
 export type schedule = {
     route_id: string;
@@ -28,28 +29,23 @@ export type schedule = {
     friday: number;
     saturday: number;
     sunday: number;
-}
+};
 
 export type station = {
-    id: number,
-    lat: number,
-    long: number,
-    station_name: string,
-    stop_id: number,
-    agency: string
-}
-
-export type outputRoutes = {
-    totalTime: number;
-    data: stationTimes[];
-}
+    id: number;
+    lat: number;
+    long: number;
+    station_name: string;
+    stop_id: string;
+    agency: string;
+};
 
 export type stationsOnRoute = {
     id: number;
     lat: number;
     long: number;
     station_name: string;
-    stop_id: number;
+    stop_id: string;
     agency: string;
     line_name: string;
     station: number;
@@ -68,10 +64,10 @@ export type stationTimes = {
 } & { [key: string]: any };
 
 export type timediff = {
-    departure: string,
-    arrival: string,
-    timediff: number
-}
+    departure: string;
+    arrival: string;
+    timediff: number;
+};
 
 export interface StopTime {
     trip_id: string;
@@ -105,10 +101,10 @@ export interface Calendar {
 }
 
 export interface Stop {
-    stop_name: string,
-    stop_lat: number,
-    stop_lon: number,
-    stop_id: number
+    stop_name: string;
+    stop_lat: number;
+    stop_lon: number;
+    stop_id: string;
 }
 
 export type stationsWithTotalTime = stationsOnRoute & {

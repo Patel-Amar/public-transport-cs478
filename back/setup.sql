@@ -3,7 +3,7 @@ CREATE TABLE stations (
     lat REAL,
     long REAL,
     station_name TEXT,
-    stop_id INTEGER,
+    stop_id TEXT,
     agency TEXT,
     UNIQUE(station_name, agency, stop_id)
 );
@@ -24,6 +24,7 @@ CREATE TABLE routes (
     friday INTEGER,
     saturday INTEGER,
     sunday INTEGER,
+    trip_id TEXT,
     FOREIGN KEY(station_id) REFERENCES stations(id)
 );
 
@@ -35,7 +36,8 @@ CREATE TABLE nearbyStations (
     b_agency TEXT,
     dist INTEGER,
     FOREIGN KEY(station_a) REFERENCES stations(id),
-    FOREIGN KEY(station_b) REFERENCES stations(id)
+    FOREIGN KEY(station_b) REFERENCES stations(id),
+    UNIQUE(station_a, station_b, b_agency, a_agency)
 );
 
 -- CREATE TABLE schedules (
@@ -59,6 +61,8 @@ CREATE INDEX IF NOT EXISTS idx_routes_line_seq ON routes (line_name, agency, sta
 CREATE INDEX IF NOT EXISTS idx_routes_station ON routes (station_id);
 CREATE INDEX IF NOT EXISTS idx_stations_id ON stations (id);
 CREATE INDEX IF NOT EXISTS idx_station_distances ON nearbyStations (station_a, station_b);
+CREATE INDEX IF NOT EXISTS idx_station_location ON stations (lat, long);
+
 
 
 CREATE TABLE shape_id (

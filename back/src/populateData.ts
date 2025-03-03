@@ -5,28 +5,46 @@ import unzipper from "unzipper";
 import csv from "csv-parser";
 import fs from "fs";
 import path from "path";
-import { Calendar, Route, Stop, StopTime, Trip, route, schedule } from "./utils.js";
+import {
+    Calendar,
+    Route,
+    Stop,
+    StopTime,
+    Trip,
+    route,
+    schedule,
+} from "./utils.js";
 import * as url from "url";
 
 let __dirname = url.fileURLToPath(new URL("..", import.meta.url));
-const db = new Database(path.join(__dirname, 'database.db'));
+const db = new Database(path.join(__dirname, "database.db"));
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
 db.pragma("synchronous = OFF");
 
-
 db.function("haversine", (lat1, long1, lat2, long2) => {
-    return distanceBetween(lat1 as number, long1 as number, lat2 as number, long2 as number);
+    return distanceBetween(
+        lat1 as number,
+        long1 as number,
+        lat2 as number,
+        long2 as number
+    );
 });
 
 async function populateSeptaData() {
-    let outputDir = await getGTFSZip("https://www3.septa.org/developer/gtfs_public.zip", false);
+    let outputDir = await getGTFSZip(
+        "https://www3.septa.org/developer/gtfs_public.zip",
+        false
+    );
     if (outputDir) {
         await unzip(outputDir, "google_bus.zip");
         await parseData(outputDir, "SEPTA");
         fs.rmSync(outputDir, { recursive: true, force: true });
     }
-    outputDir = await getGTFSZip("https://www3.septa.org/developer/gtfs_public.zip", false);
+    outputDir = await getGTFSZip(
+        "https://www3.septa.org/developer/gtfs_public.zip",
+        false
+    );
     if (outputDir) {
         await unzip(outputDir, "google_rail.zip");
         await parseData(outputDir, "SEPTA");
@@ -35,7 +53,10 @@ async function populateSeptaData() {
 }
 
 async function populateNJTransitData() {
-    let outputDir = await getGTFSZip("https://www.njtransit.com/rail_data.zip", true);
+    let outputDir = await getGTFSZip(
+        "https://www.njtransit.com/rail_data.zip",
+        true
+    );
     if (outputDir) {
         await parseData(outputDir, "NJTransit");
     }
@@ -43,11 +64,13 @@ async function populateNJTransitData() {
 }
 
 function populateNearbyStations() {
-    const stmt = db.prepare("INSERT INTO nearbyStations (station_a, a_agency, station_b, b_agency, dist) \
+    const stmt = db.prepare(
+        "INSERT OR IGNORE INTO nearbyStations (station_a, a_agency, station_b, b_agency, dist) \
                     SELECT sa.id AS station_a, sa.agency AS a_agency, sb.id AS station_b, sb.agency AS b_agency, haversine(sa.lat, sa.long, sb.lat, sb.long) AS dist \
                     FROM stations sa, stations sb \
                     WHERE sa.id != sb.id \
-                    AND haversine(sa.lat, sa.long, sb.lat, sb.long) <= 1");
+                    AND haversine(sa.lat, sa.long, sb.lat, sb.long) <= 1"
+    );
 
     stmt.run();
 }
@@ -66,7 +89,8 @@ async function getGTFSZip(url: string, addTemp: boolean) {
         redirect: "follow",
     });
 
-    if (!response.ok) throw new Error(`Failed to fetch GTFS data: ${response.statusText}`);
+    if (!response.ok)
+        throw new Error(`Failed to fetch GTFS data: ${response.statusText}`);
 
     const bodyStream = response.body;
     if (!bodyStream) throw new Error("Response body is null or undefined");
@@ -105,8 +129,17 @@ async function processStations(filePath: string, agency: string) {
                 .on("data", (row: Stop) => {
                     const { stop_id, stop_name, stop_lat, stop_lon } = row;
                     if (!stationStops.has(`${stop_id}-${agency}`)) {
-                        const { lastInsertRowid } = stmt.run(stop_name, stop_lat, stop_lon, stop_id, agency);
-                        stationStops.set(`${stop_id}-${agency}`, Number(lastInsertRowid));
+                        const { lastInsertRowid } = stmt.run(
+                            stop_name,
+                            stop_lat,
+                            stop_lon,
+                            stop_id,
+                            agency
+                        );
+                        stationStops.set(
+                            `${stop_id}-${agency}`,
+                            Number(lastInsertRowid)
+                        );
                     }
                 })
                 .on("end", resolve)
@@ -126,8 +159,25 @@ async function loadCalendar(filePath: string) {
     const data = fs.readFileSync(calendarPath, "utf8").split("\n").slice(1);
     for (const line of data) {
         if (!line.trim()) continue;
-        const [service_id, monday, tuesday, wednesday, thursday, friday, saturday, sunday] = line.split(",");
-        serviceDays.set(service_id, [parseInt(monday), parseInt(tuesday), parseInt(wednesday), parseInt(thursday), parseInt(friday), parseInt(saturday), parseInt(sunday)]);
+        const [
+            service_id,
+            monday,
+            tuesday,
+            wednesday,
+            thursday,
+            friday,
+            saturday,
+            sunday,
+        ] = line.split(",");
+        serviceDays.set(service_id, [
+            parseInt(monday),
+            parseInt(tuesday),
+            parseInt(wednesday),
+            parseInt(thursday),
+            parseInt(friday),
+            parseInt(saturday),
+            parseInt(sunday),
+        ]);
     }
     return serviceDays;
 }
@@ -140,7 +190,10 @@ async function loadCalendarExceptions(filePath: string) {
         return serviceExceptions;
     }
 
-    const data = fs.readFileSync(calendarDatesPath, "utf8").split("\n").slice(1);
+    const data = fs
+        .readFileSync(calendarDatesPath, "utf8")
+        .split("\n")
+        .slice(1);
     for (const line of data) {
         if (!line.trim()) continue;
         const [service_id] = line.split(",");
@@ -159,8 +212,7 @@ async function getServiceSchedule(filePath: string) {
         if (!serviceDays.has(service_id)) {
             if (!isNaN(service_id as any) && parseInt(service_id) % 2 === 0) {
                 serviceDays.set(service_id, [1, 1, 1, 1, 1, 0, 0]);
-            }
-            else {
+            } else {
                 serviceDays.set(service_id, [0, 0, 0, 0, 0, 1, 1]);
             }
         }
@@ -179,7 +231,7 @@ async function processRoutes(filePath: string, agency: string) {
     const calendarMap = await getServiceSchedule(filePath);
 
     const stopTimesMap = new Map<string, StopTime[]>();
-    stopTimes.forEach(st => {
+    stopTimes.forEach((st) => {
         if (!stopTimesMap.has(st.trip_id)) {
             stopTimesMap.set(st.trip_id, []);
         }
@@ -190,8 +242,8 @@ async function processRoutes(filePath: string, agency: string) {
     // let scheduleData: schedule[] = [];
 
     const insertRouteStmt = db.prepare(`
-        INSERT OR IGNORE INTO routes (station_id, station_seq, transport_type, line_name, agency, departure, arrival, monday, tuesday, wednesday, thursday, friday, saturday, sunday)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT OR IGNORE INTO routes (station_id, station_seq, transport_type, line_name, agency, departure, arrival, monday, tuesday, wednesday, thursday, friday, saturday, sunday, trip_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     // const insertScheduleStmt = db.prepare(`
@@ -237,7 +289,8 @@ async function processRoutes(filePath: string, agency: string) {
                     thursday: schedule[3],
                     friday: schedule[4],
                     saturday: schedule[5],
-                    sunday: schedule[6]
+                    sunday: schedule[6],
+                    trip_id: trip.trip_id,
                 });
 
                 // scheduleData.push({
@@ -256,29 +309,55 @@ async function processRoutes(filePath: string, agency: string) {
         }
     }
 
-    db.transaction(() => {
-        for (const row of routeData) {
-            insertRouteStmt.run(row.station_id, row.station_seq, row.transport_type, row.line_name, row.agency, row.departure, row.arrival, row.monday, row.tuesday, row.wednesday, row.thursday, row.friday, row.saturday, row.sunday);
-        }
-        // for (const row of scheduleData) {
-        //     insertScheduleStmt.run(row.route_id, row.departure, row.arrival, row.monday, row.tuesday, row.wednesday, row.thursday, row.friday, row.saturday, row.sunday);
-        // }
-    })();
+    try {
+        db.transaction(() => {
+            for (const row of routeData) {
+                insertRouteStmt.run(
+                    row.station_id,
+                    row.station_seq,
+                    row.transport_type,
+                    row.line_name,
+                    row.agency,
+                    row.departure,
+                    row.arrival,
+                    row.monday,
+                    row.tuesday,
+                    row.wednesday,
+                    row.thursday,
+                    row.friday,
+                    row.saturday,
+                    row.sunday,
+                    row.trip_id
+                );
+            }
+        })();
+        console.log("Transaction successful!");
+    } catch (error) {
+        console.error("Transaction failed:", error);
+    }
 }
 
-function distanceBetween(lat1: number, long1: number, lat2: number, long2: number) {
+function distanceBetween(
+    lat1: number,
+    long1: number,
+    lat2: number,
+    long2: number
+) {
     var R = 3963.1;
     var dLat = toRad(lat2 - lat1);
     var dLon = toRad(long2 - long1);
-    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    var a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) *
+            Math.cos(toRad(lat2)) *
+            Math.sin(dLon / 2) *
+            Math.sin(dLon / 2);
     let c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
 }
 
 function toRad(num: number) {
-    return num * Math.PI / 180;
+    return (num * Math.PI) / 180;
 }
 
 function loadFile<T>(filePath: string): Promise<T[]> {
@@ -295,7 +374,10 @@ function loadFile<T>(filePath: string): Promise<T[]> {
 export async function populateData() {
     let start = new Date().getTime();
     // await populateSeptaData();
-    // await populateNJTransitData();
-    // populateNearbyStations();
-    console.log("Data update complete:", (new Date().getTime() - start) / 60000);
+    await populateNJTransitData();
+    populateNearbyStations();
+    console.log(
+        "Data update complete:",
+        (new Date().getTime() - start) / 60000
+    );
 }
