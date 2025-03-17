@@ -2,9 +2,9 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import { rateLimit } from 'express-rate-limit'
 import findRoute from './routes.findRoute.js'
-import { populateData } from "./populateData.js";
-import { buildGraph } from './BuildGraph.js';
-// import { populateData } from "./populateData.js";
+import loginRoute from './routes.login.js'
+import { authorize } from "./middleware.js";
+import favRoute from './routes.favorite.js';
 
 const limiter = rateLimit({
     windowMs: 5 * 60 * 1000,
@@ -21,7 +21,10 @@ app.use(cookieParser());
 
 const router = express.Router();
 
-router.use("/search", findRoute);
+router.use("/", loginRoute);
+router.use("/favorite", authorize, favRoute);
+router.use("/search", authorize, findRoute);
+
 
 app.use("/api", router);
 

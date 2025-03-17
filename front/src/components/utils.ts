@@ -1,12 +1,16 @@
 import axios from "axios";
 
-export type albumType = {
-    album_image: string,
-    artists: string[] | [],
-    id: string,
-    name: string,
-    release: string
+export type routes = item[];
 
+export type item = {
+    station_id: number,
+    lat: number,
+    long: number,
+    station_name: string,
+    agency: string,
+    line_name: string,
+    time: string,
+    day: string
 }
 // https://medium.com/with-orus/the-5-commandments-of-clean-error-handling-in-typescript-93a9cbdf1af5
 function ensureError(value: unknown): Error {

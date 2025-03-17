@@ -80,3 +80,10 @@ CREATE TABLE users (
     username TEXT UNIQUE,
     password TEXT
 );
+
+CREATE TABLE favorites (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER,
+    route TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+)

@@ -2,8 +2,6 @@ import express, { Response, Request } from "express";
 import * as url from "url";
 import axios from "axios";
 import {
-    route_plan,
-    station,
     stationsOnRoute,
     stationTimes,
     timediff,
@@ -11,21 +9,14 @@ import {
 import Database from "better-sqlite3";
 import { buildGraph } from "./BuildGraph.js";
 import { populateData } from "./populateData.js";
-import { stat } from "fs";
 import path from "path";
 import { MinHeap } from "./MinHeap.js";
+import { stat } from "fs";
 
 const router = express.Router();
 
 let MAX_WALKING_DISTANCE = 0.75;
 
-// let __dirname = url.fileURLToPath(new URL("..", import.meta.url));
-// const db = new Database(":memory:");
-
-// db.exec(`ATTACH DATABASE "${__dirname}database.db" AS disk`);
-// db.exec("CREATE TABLE main.routes AS SELECT * FROM disk.routes");
-// db.exec("CREATE TABLE main.stations AS SELECT * FROM disk.stations");
-// db.exec('CREATE TABLE main.schedules AS SELECT * FROM disk.schedules');
 let __dirname = url.fileURLToPath(new URL("..", import.meta.url));
 const db = new Database(path.join(__dirname, "database.db"));
 db.pragma("journal_mode = WAL");
@@ -74,8 +65,8 @@ let daysOfWeek = [
 
 async function findRoute1(req: Request, res: Response) {
     try {
-        if (!req.params.start || !req.params.end) {
-            return res.json({ error: "Start or end address not valid" });
+        if (!req.params.start || !req.params.end || !req.params.date) {
+            return res.json({ error: "Start or end address or start date not valid" });
         }
         let start = encodeURIComponent(req.params.start);
         let end = encodeURIComponent(req.params.end);
@@ -106,7 +97,8 @@ async function findRoute1(req: Request, res: Response) {
             Number(startInfo.lat),
             Number(startInfo.lon),
             Number(endInfo.lat),
-            Number(endInfo.lon)
+            Number(endInfo.lon),
+            Number(req.params.date)
         );
 
         return res.json({ routes: routes });
@@ -116,8 +108,8 @@ async function findRoute1(req: Request, res: Response) {
     }
 }
 
-function getTimes(routes: stationsOnRoute[]) {
-    const currTime = new Date();
+function getTimes(routes: stationsOnRoute[], startDate: number) {
+    const currTime = new Date(startDate);
     let currDay = currTime
         .toLocaleString("en-us", { weekday: "long" })
         .toLowerCase();
@@ -160,29 +152,34 @@ function getTimes(routes: stationsOnRoute[]) {
             useData = false;
             break;
         }
+
         let departureTime = parseTimeToSeconds(data.departure);
+
         if (departureTime >= 24 * 60 * 60) {
-            let s = departureTime % 60;
-            let m = Math.floor(departureTime / 60) % 60;
-            let h = Math.floor(departureTime / 3600) - 24;
-            currDay = daysOfWeek[(daysOfWeek.indexOf(currDay) + 1) % 7];
+            let extraDays = Math.floor(departureTime / (24 * 60 * 60));
+            let remainingSeconds = departureTime % (24 * 60 * 60);
+
+            let s = remainingSeconds % 60;
+            let m = Math.floor(remainingSeconds / 60) % 60;
+            let h = Math.floor(remainingSeconds / 3600);
+
+            currDay = daysOfWeek[(daysOfWeek.indexOf(currDay) + extraDays) % 7];
+
             data.departure = `${h.toString().padStart(2, "0")}:${m
                 .toString()
                 .padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
         }
 
-        let arrivalTime = parseTimeToSeconds(data.arrival);
-        if (arrivalTime >= 24 * 60 * 60) {
-            let s = arrivalTime % 60;
-            let m = Math.floor(arrivalTime / 60) % 60;
-            let h = Math.floor(arrivalTime / 3600) - 24;
-            currDay = daysOfWeek[(daysOfWeek.indexOf(currDay) + 1) % 7];
-            data.arrival = `${h.toString().padStart(2, "0")}:${m
-                .toString()
-                .padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+        if (temp.length > 1) {
+            const prevArrivalTime = parseTimeToSeconds(temp[temp.length - 1].time);
+            if (prevArrivalTime > departureTime) {
+                currDay = daysOfWeek[(daysOfWeek.indexOf(currDay) + 1) % 7];
+            }
+        } else {
+            if (currTimeInSeconds > departureTime) {
+                currDay = daysOfWeek[(daysOfWeek.indexOf(currDay) + 1) % 7];
+            }
         }
-
-        currTimeInSeconds = parseTimeToSeconds(data.arrival);
 
         temp.push({
             station_id: station_a.id,
@@ -194,6 +191,24 @@ function getTimes(routes: stationsOnRoute[]) {
             time: data?.departure,
             day: currDay,
         });
+
+        let arrivalTime = parseTimeToSeconds(data.arrival);
+        if (arrivalTime >= 24 * 60 * 60) {
+            let extraDays = Math.floor(arrivalTime / (24 * 60 * 60));
+            let remainingSeconds = arrivalTime % (24 * 60 * 60);
+
+            let s = remainingSeconds % 60;
+            let m = Math.floor(remainingSeconds / 60) % 60;
+            let h = Math.floor(remainingSeconds / 3600);
+
+            currDay = daysOfWeek[(daysOfWeek.indexOf(currDay) + extraDays) % 7];
+
+            data.arrival = `${h.toString().padStart(2, "0")}:${m
+                .toString()
+                .padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+        }
+
+        currTimeInSeconds = parseTimeToSeconds(data.arrival);
 
         temp.push({
             station_id: station_b.id,
@@ -250,7 +265,8 @@ async function findRoutes(
     startLat: number,
     startLong: number,
     endLat: number,
-    endLong: number
+    endLong: number,
+    date: number
 ) {
     let routes: stationsOnRoute[][] = [];
 
@@ -273,28 +289,19 @@ async function findRoutes(
         MAX_WALKING_DISTANCE
     ) as stationsOnRoute[];
 
-    let temp = [];
+    let possibleRoutes = [];
     for (const station of possibleStations) {
         let route = findPath(station, endLat, endLong);
         if (route) {
-            temp.push(route);
+            possibleRoutes.push(route);
         }
     }
 
     let leader = Infinity;
     let finalRoute: stationsOnRoute[] = [];
 
-    for (const route of temp) {
-        if (route.length < leader && route.length > 1) {
-            leader = route.length;
-            finalRoute = route;
-        }
-    }
-
-    routes.push(finalRoute);
-
     let processRoute: stationsOnRoute[] = [];
-    for (const route of routes) {
+    for (const route of possibleRoutes) {
         let temp: stationsOnRoute[] = [];
         if (route.length <= 1 || route[1]?.line_name !== route[0].line_name) {
             continue;
@@ -312,9 +319,15 @@ async function findRoutes(
                 temp.push(route[i]);
             }
         }
-        processRoute = temp;
+        if (temp.length < leader && temp.length > 1) {
+            leader = temp.length;
+            finalRoute = temp;
+        }
+
     }
-    const out = getTimes(processRoute);
+
+    processRoute = finalRoute;
+    const out = getTimes(processRoute, date);
     return out;
 }
 
@@ -323,29 +336,34 @@ function findPath(
     endLat: number,
     endLong: number
 ): stationsOnRoute[] | null {
+    const WALKING_PENALTY = 1000;
+    const TRANSFER_PENALTY = 5;
+
     const pq = new MinHeap<{
         station: stationsOnRoute;
         path: stationsOnRoute[];
         cost: number;
+        totalWalking: number;
         line: string;
-    }>((a, b) => a.cost - b.cost);
+    }>((a, b) => a.cost - b.cost || a.totalWalking - b.totalWalking);
 
-    pq.push({ station: start, path: [start], cost: 0, line: start.line_name });
+    pq.push({
+        station: start,
+        path: [start],
+        cost: 0,
+        totalWalking: 0,
+        line: start.line_name
+    });
 
     const visited = new Set<string>();
 
     while (!pq.isEmpty()) {
         const current = pq.pop();
-        if (!current) {
-            return null;
-        }
+        if (!current) return null;
 
-        const { station, path, cost, line } = current;
+        const { station, path, cost, totalWalking, line } = current;
 
-        if (
-            distanceBetween(station.lat, station.long, endLat, endLong) <=
-            MAX_WALKING_DISTANCE
-        ) {
+        if (distanceBetween(station.lat, station.long, endLat, endLong) <= MAX_WALKING_DISTANCE) {
             return path;
         }
 
@@ -353,36 +371,44 @@ function findPath(
         if (visited.has(visitedKey)) continue;
         visited.add(visitedKey);
 
-        const neighbors = graph.get(station.id) || [];
+        let neighbors = graph.get(station.id) || [];
+
+        neighbors.sort((a, b) => {
+            const walkA = distanceBetween(station.lat, station.long, a.lat, a.long);
+            const walkB = distanceBetween(station.lat, station.long, b.lat, b.long);
+            return walkA - walkB;
+        });
 
         for (const neighbor of neighbors) {
             if (visited.has(`${neighbor.id}-${neighbor.line_name}`)) continue;
 
-            let newCost =
-                cost +
-                distanceBetween(neighbor.lat, neighbor.long, endLat, endLong);
+            let walkDistance = distanceBetween(station.lat, station.long, neighbor.lat, neighbor.long);
+            let newCost = cost;
+            let newTotalWalking = totalWalking + walkDistance;
 
             if (neighbor.line_name === line) {
-                pq.push({
-                    station: neighbor,
-                    path: [...path, neighbor],
-                    cost: newCost,
-                    line: line,
-                });
+                newCost += walkDistance;
             } else {
-                const transferPenalty = 5;
-                pq.push({
-                    station: neighbor,
-                    path: [...path, neighbor],
-                    cost: newCost + transferPenalty,
-                    line: neighbor.line_name,
-                });
+                newCost += walkDistance + TRANSFER_PENALTY;
             }
+
+            if (station.line_name !== neighbor.line_name) {
+                newCost += WALKING_PENALTY;
+            }
+
+            pq.push({
+                station: neighbor,
+                path: [...path, neighbor],
+                cost: newCost,
+                totalWalking: newTotalWalking,
+                line: neighbor.line_name,
+            });
         }
     }
 
     return null;
 }
+
 
 function distanceBetween(
     lat1: number,
@@ -396,9 +422,9 @@ function distanceBetween(
     var a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos(toRad(lat1)) *
-            Math.cos(toRad(lat2)) *
-            Math.sin(dLon / 2) *
-            Math.sin(dLon / 2);
+        Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
     let c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
 }
@@ -407,14 +433,35 @@ function toRad(num: number) {
     return (num * Math.PI) / 180;
 }
 
-router.get("/", async (req: Request, res: Response) => {
-    let s = db.prepare(`
-        SELECT * FROM routes WHERE station_id='100'
-    `);
-    // await buildGraph();
-    // return res.json({ data: [...graph.entries()] });
-    return res.json({ data: s.all() });
-});
-router.get("/:start/:end", findRoute1);
+async function fromFavorite(req: Request, res: Response) {
+    const { data } = req.body;
+
+    if (data && req.params.date) {
+        let routes: stationsOnRoute[] = [];
+
+        for (const [key, val] of Object.entries(data)) {
+            const station = val as stationTimes;
+            routes.push({
+                id: station?.station_id,
+                lat: station?.lat,
+                long: station?.long,
+                station_name: station?.station_name,
+                stop_id: String(station?.station_id),
+                agency: station?.agency,
+                line_name: station?.line_name,
+                station: station?.station_id,
+                route_id: station?.line_name
+            });
+        }
+        console.log(routes);
+        const out = getTimes(routes, Number(req.params.date));
+
+        return res.status(200).json({ routes: out })
+    }
+    return res.status(500).json({ error: "Could not get route data" })
+}
+
+router.get("/:start/:end/:date", findRoute1);
+router.post("/:date", fromFavorite);
 
 export default router;

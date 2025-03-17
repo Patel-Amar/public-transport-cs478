@@ -349,9 +349,9 @@ function distanceBetween(
     var a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos(toRad(lat1)) *
-            Math.cos(toRad(lat2)) *
-            Math.sin(dLon / 2) *
-            Math.sin(dLon / 2);
+        Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
     let c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
 }
@@ -374,8 +374,8 @@ function loadFile<T>(filePath: string): Promise<T[]> {
 export async function populateData() {
     let start = new Date().getTime();
     // await populateSeptaData();
-    await populateNJTransitData();
-    populateNearbyStations();
+    // await populateNJTransitData();
+    // populateNearbyStations();
     console.log(
         "Data update complete:",
         (new Date().getTime() - start) / 60000
