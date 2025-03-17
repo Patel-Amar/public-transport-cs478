@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import './Feed.css'
 import { Box, Button, ButtonGroup, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import axios from 'axios';
 import { InputGroup } from './ui/input-group';
-import { routes } from './utils';
+import { item, routes } from './utils';
 import { FaTrash } from "react-icons/fa";
 
 function Favorites() {
@@ -138,7 +137,7 @@ function Favorites() {
 
                                 {selectedRoute.length > 1 ? (
                                     <VStack width="100%" overflowY="auto" maxH="60vh">
-                                        {selectedRoute.map((route, index) => (
+                                        {selectedRoute.map((route: item, index: number) => (
                                             <HStack key={index} justifyContent="space-between" width="100%" mb="1rem">
                                                 <VStack align="flex-start">
                                                     <Text>{route.station_name}</Text>

@@ -5,7 +5,6 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { createSystem, defaultConfig, defineConfig, SystemContext } from "@chakra-ui/react";
 import Layout from "./components/layout";
 import Login from "./components/Login";
-import App from "./App";
 import Favorites from "./components/Favorites";
 import FindRoute from "./components/FindRoute";
 
@@ -30,7 +29,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <Routes>
                     <Route path="/login" element={<Login />} />
                     <Route element={<Layout />}>
-                        <Route path="/" element={<App />} />
                         <Route path="/home" element={<FindRoute />} />
                         <Route path="/favorites" element={<Favorites />} />
                         <Route path="*" element={<FindRoute />} />

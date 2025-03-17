@@ -1,4 +1,3 @@
-import './Collection.css'
 import { Box, Button, HStack, Input, VStack, Text, ButtonGroup, Spinner } from '@chakra-ui/react';
 import Feature from 'ol/Feature';
 import Map from 'ol/Map.js';
@@ -11,7 +10,7 @@ import { fromLonLat } from 'ol/proj';
 import { XYZ } from 'ol/source';
 import VectorSource from 'ol/source/Vector';
 import { useEffect, useRef, useState } from 'react';
-import { routes } from './utils';
+import { item, routes } from './utils';
 import { InputGroup } from './ui/input-group';
 import axios from 'axios';
 import Style from 'ol/style/Style';
@@ -191,7 +190,7 @@ function FindRoute() {
 
                         {route?.length > 1 ?
                             <VStack width="100%" overflowY={"scroll"} maxH={"30vh"}>
-                                {route.map((route, index) => (
+                                {route.map((route: item, index: number) => (
                                     <HStack key={index} justifyContent="space-between" width="100%" mb={"1rem"}>
                                         <VStack align="flex-start">
                                             <Text color={colors[index % colors.length]}>{route.station_name}</Text>
